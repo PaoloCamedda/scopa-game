@@ -49,6 +49,7 @@ Il progetto nasce con l'obiettivo di digitalizzare l'esperienza del gioco della 
 │             ├── trinacrea.png
 │             └── carte/ # Mazzo di 40 carte + Dorso
 └── pom.xml              # Configurazione Maven
+```
 
 ## 🎮 Guida all'Utilizzo
 
