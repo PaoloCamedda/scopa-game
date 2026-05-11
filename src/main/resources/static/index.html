@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" type="image/png" href="/images/trinacrea.png">
-    <title>Scopa Online - Versione Definitiva</title>
+    <title>Scopa Online </title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <style>
@@ -53,6 +53,11 @@
         .mazzetto-stack {
             box-shadow: 2px 2px 0px #444, 4px 4px 0px #333, 6px 6px 15px rgba(0,0,0,0.5);
         }
+
+        /* Animazione per il tallone che finisce */
+        .deck-shadow {
+            filter: drop-shadow(4px 4px 10px rgba(0,0,0,0.5));
+        }
     </style>
 </head>
 <body class="text-white min-h-screen font-sans overflow-hidden">
@@ -73,6 +78,11 @@
         <div class="flex justify-center items-center gap-8 p-4 bg-black/20 rounded-2xl shadow-inner relative">
             <div class="absolute -top-3 left-4 bg-blue-900 px-3 py-1 rounded-full text-xs font-mono uppercase tracking-widest text-blue-100">Avversario</div>
 
+            <div class="bg-blue-600 text-white px-4 py-2 rounded-xl font-bold flex flex-col items-center shadow-lg">
+                <span class="text-[10px] uppercase opacity-70">Scope</span>
+                <span class="text-xl font-black">{{partita?.cpu?.scope}}</span>
+            </div>
+
             <transition-group name="card-anim" tag="div" class="flex gap-2">
                 <div v-for="n in partita?.cpu?.mano?.length || 0" :key="`cpu-back-${n}`"
                      class="w-20 h-32 md:w-24 md:h-36 rounded-lg shadow-md overflow-hidden bg-white border border-gray-200">
@@ -88,26 +98,41 @@
             </div>
         </div>
 
-        <div class="table-area my-6 p-6 border-4 border-dashed border-green-700 rounded-3xl flex flex-col justify-center gap-4 items-center min-h-[16rem] relative shadow-2xl"
-             :class="{ 'drag-over': isDragOverTable }"
-             @dragover.prevent="onDragOverTable"
-             @dragleave="onDragLeaveTable"
-             @drop="onDropOnTable">
+        <div class="flex items-center justify-center gap-6 w-full">
 
-            <h2 v-if="partita?.tavolo?.length === 0" class="text-3xl font-light text-green-300/40 italic select-none">Tavolo Vuoto.</h2>
-
-            <transition-group name="card-anim" tag="div" class="flex flex-wrap justify-center gap-4">
-                <div v-for="(carta, index) in partita?.tavolo" :key="'table-' + index"
-                     @click="toggleSelezioneTavolo(index)"
-                     class="table-card w-24 h-36 md:w-28 md:h-40 rounded-lg shadow-xl overflow-hidden bg-white border border-gray-100 relative"
-                     :class="{ 'selected-table-card': indiciSelezionatiTavolo.includes(index) }">
-                    <img :src="getCardImageUrl(carta)" class="w-full h-full object-contain p-1">
-                    <div v-if="indiciSelezionatiTavolo.includes(index)" class="sum-badge">✓</div>
+            <div class="hidden lg:flex flex-col items-center gap-2 w-32">
+                <div v-if="getCarteRimanenti > 0" class="relative deck-shadow">
+                    <img src="/images/carte/Dorso.png"
+                         class="w-24 h-36 rounded-lg border-2 border-green-900"
+                         :style="{ boxShadow: getMazzoShadow }">
+                    <div class="absolute inset-0 flex items-center justify-center">
+                        <span class="bg-black/60 px-2 py-1 rounded text-xl font-black text-yellow-400">{{getCarteRimanenti}}</span>
+                    </div>
                 </div>
-            </transition-group>
+                <span class="text-xs font-mono uppercase text-green-400/60">Mazzo</span>
+            </div>
 
-            <div v-if="isCpuThinking" class="absolute bottom-4 text-yellow-400 animate-pulse font-mono text-sm uppercase tracking-widest">
-                L'avversario sta pensando...
+            <div class="table-area flex-grow my-6 p-6 border-4 border-dashed border-green-700 rounded-3xl flex flex-col justify-center gap-4 items-center min-h-[16rem] relative shadow-2xl"
+                 :class="{ 'drag-over': isDragOverTable }"
+                 @dragover.prevent="onDragOverTable"
+                 @dragleave="onDragLeaveTable"
+                 @drop="onDropOnTable">
+
+                <h2 v-if="partita?.tavolo?.length === 0" class="text-3xl font-light text-green-300/40 italic select-none">Tavolo Vuoto.</h2>
+
+                <transition-group name="card-anim" tag="div" class="flex flex-wrap justify-center gap-4">
+                    <div v-for="(carta, index) in partita?.tavolo" :key="'table-' + index"
+                         @click="toggleSelezioneTavolo(index)"
+                         class="table-card w-24 h-36 md:w-28 md:h-40 rounded-lg shadow-xl overflow-hidden bg-white border border-gray-100 relative"
+                         :class="{ 'selected-table-card': indiciSelezionatiTavolo.includes(index) }">
+                        <img :src="getCardImageUrl(carta)" class="w-full h-full object-contain p-1">
+                        <div v-if="indiciSelezionatiTavolo.includes(index)" class="sum-badge">✓</div>
+                    </div>
+                </transition-group>
+
+                <div v-if="isCpuThinking" class="absolute bottom-4 text-yellow-400 animate-pulse font-mono text-sm uppercase tracking-widest">
+                    L'avversario sta pensando...
+                </div>
             </div>
         </div>
 
@@ -197,9 +222,32 @@
                 mostraRecapFinale: false
             }
         },
+        computed: {
+            // Calcola quante carte rimangono nel mazzo centrale
+            getCarteRimanenti() {
+                if (!this.partita) return 0;
+                const totali = 40;
+                const inManoUmano = this.partita.umano.mano.length;
+                const inManoCpu = this.partita.cpu.mano.length;
+                const preseUmano = this.partita.umano.mazzettoPreso.length;
+                const preseCpu = this.partita.cpu.mazzettoPreso.length;
+                const inTavolo = this.partita.tavolo.length;
+
+                return totali - (inManoUmano + inManoCpu + preseUmano + preseCpu + inTavolo);
+            },
+            // Crea un effetto di profondità per il mazzo basato sulle carte restanti
+            getMazzoShadow() {
+                const n = Math.ceil(this.getCarteRimanenti / 4);
+                let shadow = "";
+                for(let i = 1; i <= n; i++) {
+                    shadow += `${i}px ${i}px 0px #222${i === n ? '' : ', '}`;
+                }
+                return shadow;
+            }
+        },
         methods: {
             async iniziaPartita() {
-                const res = await fetch('/api/game/start?nome=Paolo');
+                const res = await fetch('/api/game/start?nome=Player');
                 this.partita = await res.json();
                 this.mostraRecapFinale = false;
             },
@@ -265,30 +313,23 @@
                         return;
                     }
 
-                    // --- SOLUZIONE BUG: AGGIORNAMENTO IMMEDIATO ---
                     // 1. Rimuoviamo subito la carta dalla mano del giocatore (visivamente)
                     const cartaGiocata = this.partita.umano.mano.splice(indexMano, 1)[0];
 
                     // 2. Se è stata una presa, rimuoviamo subito le carte dal tavolo
                     if (this.indiciSelezionatiTavolo.length > 0) {
-                        // Ordiniamo gli indici dal più grande al più piccolo per non sballare l'array durante la rimozione
                         this.indiciSelezionatiTavolo.sort((a, b) => b - a).forEach(idx => {
                             this.partita.tavolo.splice(idx, 1);
                         });
-                        // Aggiungiamo le carte al mazzetto (opzionale, per feedback visivo immediato)
                         this.partita.umano.mazzettoPreso.push(cartaGiocata);
                     } else {
-                        // Se è un calo, aggiungiamola al tavolo temporaneamente
                         this.partita.tavolo.push(cartaGiocata);
                     }
 
-                    // 3. Reset variabili e inizio attesa CPU
                     this.indiciSelezionatiTavolo = [];
                     this.isCpuThinking = true;
 
-                    // Aspettiamo che la CPU "ragioni"
                     setTimeout(async () => {
-                        // Ora chiediamo lo stato reale al server (che contiene la mossa CPU)
                         await this.aggiornaStato();
                         this.messaggioEsito = testoRisposta;
                         this.isCpuThinking = false;
@@ -298,7 +339,7 @@
                         }
 
                         setTimeout(() => this.messaggioEsito = null, 2000);
-                    }, 1500); // Ritardo della CPU
+                    }, 1500);
 
                 } catch (error) {
                     console.error("Errore giocata:", error);
