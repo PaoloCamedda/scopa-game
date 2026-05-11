@@ -4,8 +4,14 @@ import java.util.ArrayList;
 import java.util.List;
 import com.example.scopa.model.Mazzo.*;
 import lombok.Getter;
+import lombok.Setter;
 
 public class Partita {
+
+    @Getter
+    @Setter
+    private Giocatore ultimoPrenditore;
+
     @Getter
     private Mazzo mazzo;
     @Getter
@@ -53,3 +59,4 @@ public class Partita {
     }
 
 }
+

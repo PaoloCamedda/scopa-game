@@ -15,6 +15,31 @@
         .table-area { transition: border-color 0.3s, background-color 0.3s; }
         .table-area.drag-over { border-color: #f59e0b; background-color: rgba(245, 158, 11, 0.1); }
 
+        .table-card { transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); cursor: pointer; }
+
+        .selected-table-card {
+            transform: translateY(-20px) scale(1.05);
+            box-shadow: 0 0 20px rgba(245, 158, 11, 0.8);
+            border: 4px solid #f59e0b !important;
+        }
+
+        .sum-badge {
+            position: absolute;
+            top: -20px;
+            right: -10px;
+            background: #f59e0b;
+            color: black;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 0.8rem;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+
         .card-anim-enter-active, .card-anim-leave-active { transition: all 0.5s ease; }
         .card-anim-enter-from { opacity: 0; transform: scale(0.5) translateY(50px); }
         .card-anim-leave-to { opacity: 0; transform: scale(0.8) translateY(-30px); }
@@ -22,6 +47,11 @@
         body {
             background-color: #064e3b;
             background-image: radial-gradient(circle, #065f46 0%, #064e3b 100%);
+        }
+
+        /* Effetto spessore mazzetto */
+        .mazzetto-stack {
+            box-shadow: 2px 2px 0px #444, 4px 4px 0px #333, 6px 6px 15px rgba(0,0,0,0.5);
         }
     </style>
 </head>
@@ -40,18 +70,25 @@
 
     <main class="flex-grow flex flex-col justify-between p-4 md:p-6 lg:p-8">
 
-        <div class="flex justify-center gap-2 p-4 bg-black/20 rounded-2xl shadow-inner relative">
+        <div class="flex justify-center items-center gap-8 p-4 bg-black/20 rounded-2xl shadow-inner relative">
             <div class="absolute -top-3 left-4 bg-blue-900 px-3 py-1 rounded-full text-xs font-mono uppercase tracking-widest text-blue-100">Avversario</div>
+
             <transition-group name="card-anim" tag="div" class="flex gap-2">
                 <div v-for="n in partita?.cpu?.mano?.length || 0" :key="`cpu-back-${n}`"
                      class="w-20 h-32 md:w-24 md:h-36 rounded-lg shadow-md overflow-hidden bg-white border border-gray-200">
                     <img src="/images/carte/Dorso.png" class="w-full h-full object-cover">
                 </div>
             </transition-group>
-            <div class="self-center ml-6 text-sm text-gray-400">Prese: {{partita?.cpu?.mazzettoPreso?.length}}</div>
+
+            <div v-if="partita?.cpu?.mazzettoPreso?.length > 0" class="relative ml-4">
+                <img src="/images/carte/Dorso.png" class="w-16 h-24 rounded-lg mazzetto-stack border border-gray-400 transform rotate-3">
+                <div class="absolute -bottom-2 -right-2 bg-blue-600 text-white text-xs font-bold px-2 py-1 rounded-full">
+                    {{partita.cpu.mazzettoPreso.length}}
+                </div>
+            </div>
         </div>
 
-        <div class="table-area my-6 p-6 border-4 border-dashed border-green-700 rounded-3xl flex flex-wrap justify-center gap-4 items-center min-h-[16rem] relative shadow-2xl"
+        <div class="table-area my-6 p-6 border-4 border-dashed border-green-700 rounded-3xl flex flex-col justify-center gap-4 items-center min-h-[16rem] relative shadow-2xl"
              :class="{ 'drag-over': isDragOverTable }"
              @dragover.prevent="onDragOverTable"
              @dragleave="onDragLeaveTable"
@@ -61,16 +98,23 @@
 
             <transition-group name="card-anim" tag="div" class="flex flex-wrap justify-center gap-4">
                 <div v-for="(carta, index) in partita?.tavolo" :key="'table-' + index"
-                     class="w-24 h-36 md:w-28 md:h-40 rounded-lg shadow-xl overflow-hidden bg-white border border-gray-100 transform hover:scale-105 transition-transform">
+                     @click="toggleSelezioneTavolo(index)"
+                     class="table-card w-24 h-36 md:w-28 md:h-40 rounded-lg shadow-xl overflow-hidden bg-white border border-gray-100 relative"
+                     :class="{ 'selected-table-card': indiciSelezionatiTavolo.includes(index) }">
                     <img :src="getCardImageUrl(carta)" class="w-full h-full object-contain p-1">
+                    <div v-if="indiciSelezionatiTavolo.includes(index)" class="sum-badge">✓</div>
                 </div>
             </transition-group>
+
+            <div v-if="isCpuThinking" class="absolute bottom-4 text-yellow-400 animate-pulse font-mono text-sm uppercase tracking-widest">
+                L'avversario sta pensando...
+            </div>
         </div>
 
-        <div class="flex flex-col items-center gap-6 relative p-4 bg-black/20 rounded-2xl w-full">
+        <div class="flex flex-row items-center justify-center gap-8 relative p-4 bg-black/20 rounded-2xl w-full">
             <div class="absolute -top-3 left-4 bg-yellow-600 px-3 py-1 rounded-full text-xs font-mono uppercase tracking-widest text-yellow-100">Tuo Turno</div>
 
-            <transition-group name="card-anim" tag="div" class="flex gap-4 justify-center items-end min-h-[12rem] w-full">
+            <transition-group name="card-anim" tag="div" class="flex gap-4 justify-center items-end min-h-[12rem]">
                 <div v-for="(carta, index) in partita?.umano?.mano"
                      :key="'player-card-' + index"
                      class="hand-card w-28 h-44 md:w-32 md:h-48 rounded-xl shadow-2xl overflow-hidden bg-white border-2 border-white transform origin-bottom"
@@ -81,9 +125,16 @@
                 </div>
             </transition-group>
 
-            <div class="bg-yellow-500 text-black px-8 py-2 rounded-full font-bold text-lg shadow-lg flex gap-3">
-                Scope: <span class="text-2xl font-black">{{partita?.umano?.scope}}</span> |
-                Prese: <span class="text-2xl font-black">{{partita?.umano?.mazzettoPreso?.length}}</span>
+            <div v-if="partita?.umano?.mazzettoPreso?.length > 0" class="relative cursor-pointer hover:scale-105 transition-transform" @click="mostraRecapFinale = true">
+                <img src="/images/carte/Dorso.png" class="w-20 h-32 rounded-lg mazzetto-stack border-2 border-yellow-400 transform -rotate-3">
+                <div class="absolute -bottom-2 -right-2 bg-yellow-500 text-black text-sm font-bold px-3 py-1 rounded-full shadow-lg">
+                    {{partita.umano.mazzettoPreso.length}}
+                </div>
+            </div>
+
+            <div class="bg-yellow-500 text-black px-6 py-2 rounded-xl font-bold text-lg shadow-lg flex flex-col items-center">
+                <span class="text-xs uppercase opacity-70">Scope</span>
+                <span class="text-2xl font-black">{{partita?.umano?.scope}}</span>
             </div>
         </div>
 
@@ -97,6 +148,31 @@
             </div>
             <button @click="iniziaPartita" class="bg-yellow-500 hover:bg-yellow-400 text-black px-16 py-8 rounded-full font-black text-4xl shadow-2xl transition transform hover:scale-105 active:scale-95 uppercase tracking-wider">
                 Nuova Partita
+            </button>
+        </div>
+    </transition>
+
+    <transition name="card-anim">
+        <div v-if="mostraRecapFinale" class="fixed inset-0 bg-black/95 z-[100] flex flex-col items-center p-8 overflow-y-auto">
+            <h2 class="text-6xl font-black text-yellow-400 mb-10 uppercase tracking-tighter">Fine Partita</h2>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-5xl">
+                <div class="bg-white/5 p-6 rounded-3xl border border-yellow-500/30">
+                    <h3 class="text-2xl font-bold text-yellow-400 mb-4">{{partita.umano.nome}}: {{partita.umano.punti}} pt</h3>
+                    <div class="flex flex-wrap gap-1">
+                        <img v-for="c in partita.umano.mazzettoPreso" :src="getCardImageUrl(c)" class="w-12 h-18 object-contain">
+                    </div>
+                </div>
+                <div class="bg-white/5 p-6 rounded-3xl border border-blue-500/30">
+                    <h3 class="text-2xl font-bold text-blue-400 mb-4">CPU: {{partita.cpu.punti}} pt</h3>
+                    <div class="flex flex-wrap gap-1">
+                        <img v-for="c in partita.cpu.mazzettoPreso" :src="getCardImageUrl(c)" class="w-12 h-18 object-contain opacity-70">
+                    </div>
+                </div>
+            </div>
+
+            <button @click="mostraRecapFinale = false; iniziaPartita()" class="mt-10 bg-yellow-500 text-black px-12 py-4 rounded-full font-black text-xl hover:bg-yellow-400 transition">
+                NUOVA PARTITA
             </button>
         </div>
     </transition>
@@ -115,14 +191,17 @@
                 partita: null,
                 draggedCardIndex: null,
                 isDragOverTable: false,
-                messaggioEsito: null
+                isCpuThinking: false,
+                indiciSelezionatiTavolo: [],
+                messaggioEsito: null,
+                mostraRecapFinale: false
             }
         },
         methods: {
             async iniziaPartita() {
                 const res = await fetch('/api/game/start?nome=Paolo');
                 this.partita = await res.json();
-                console.log("Stato iniziale caricato:", this.partita);
+                this.mostraRecapFinale = false;
             },
 
             getCardImageUrl(carta) {
@@ -136,12 +215,22 @@
                 return `/images/carte/${v}_${s}.png`;
             },
 
+            toggleSelezioneTavolo(index) {
+                const pos = this.indiciSelezionatiTavolo.indexOf(index);
+                if (pos > -1) {
+                    this.indiciSelezionatiTavolo.splice(pos, 1);
+                } else {
+                    this.indiciSelezionatiTavolo.push(index);
+                }
+            },
+
             async aggiornaStato() {
                 const res = await fetch('/api/game/status');
                 this.partita = await res.json();
             },
 
             onDragStartCard(index, event) {
+                if(this.isCpuThinking) return;
                 this.draggedCardIndex = index;
                 event.dataTransfer.effectAllowed = "move";
             },
@@ -150,26 +239,70 @@
                 this.draggedCardIndex = null;
             },
 
-            onDragOverTable() {
-                this.isDragOverTable = true;
-            },
-
-            onDragLeaveTable() {
-                this.isDragOverTable = false;
-            },
+            onDragOverTable() { this.isDragOverTable = true; },
+            onDragLeaveTable() { this.isDragOverTable = false; },
 
             async onDropOnTable(event) {
                 this.isDragOverTable = false;
-                const index = this.draggedCardIndex;
-                if (index === null) return;
+                const indexMano = this.draggedCardIndex;
+                if (indexMano === null || this.isCpuThinking) return;
 
                 try {
-                    const response = await fetch(`/api/game/play?index=${index}`);
-                    this.messaggioEsito = await response.text();
-                    await this.aggiornaStato();
-                    setTimeout(() => this.messaggioEsito = null, 3000);
+                    const response = await fetch(`/api/game/play`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            indexMano: indexMano,
+                            indiciTavolo: this.indiciSelezionatiTavolo
+                        })
+                    });
+
+                    const testoRisposta = await response.text();
+
+                    if (testoRisposta.includes("Errore")) {
+                        this.messaggioEsito = testoRisposta;
+                        setTimeout(() => this.messaggioEsito = null, 3000);
+                        return;
+                    }
+
+                    // --- SOLUZIONE BUG: AGGIORNAMENTO IMMEDIATO ---
+                    // 1. Rimuoviamo subito la carta dalla mano del giocatore (visivamente)
+                    const cartaGiocata = this.partita.umano.mano.splice(indexMano, 1)[0];
+
+                    // 2. Se è stata una presa, rimuoviamo subito le carte dal tavolo
+                    if (this.indiciSelezionatiTavolo.length > 0) {
+                        // Ordiniamo gli indici dal più grande al più piccolo per non sballare l'array durante la rimozione
+                        this.indiciSelezionatiTavolo.sort((a, b) => b - a).forEach(idx => {
+                            this.partita.tavolo.splice(idx, 1);
+                        });
+                        // Aggiungiamo le carte al mazzetto (opzionale, per feedback visivo immediato)
+                        this.partita.umano.mazzettoPreso.push(cartaGiocata);
+                    } else {
+                        // Se è un calo, aggiungiamola al tavolo temporaneamente
+                        this.partita.tavolo.push(cartaGiocata);
+                    }
+
+                    // 3. Reset variabili e inizio attesa CPU
+                    this.indiciSelezionatiTavolo = [];
+                    this.isCpuThinking = true;
+
+                    // Aspettiamo che la CPU "ragioni"
+                    setTimeout(async () => {
+                        // Ora chiediamo lo stato reale al server (che contiene la mossa CPU)
+                        await this.aggiornaStato();
+                        this.messaggioEsito = testoRisposta;
+                        this.isCpuThinking = false;
+
+                        if (testoRisposta.includes("terminata")) {
+                            setTimeout(() => { this.mostraRecapFinale = true; }, 1000);
+                        }
+
+                        setTimeout(() => this.messaggioEsito = null, 2000);
+                    }, 1500); // Ritardo della CPU
+
                 } catch (error) {
                     console.error("Errore giocata:", error);
+                    this.isCpuThinking = false;
                 }
                 this.draggedCardIndex = null;
             }

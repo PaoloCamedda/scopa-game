@@ -34,6 +34,7 @@ public class Giocatore {
 
     public void faiScopa() {
         this.scope++;
+        this.punti++;
     }
 
     // Getter e Setter

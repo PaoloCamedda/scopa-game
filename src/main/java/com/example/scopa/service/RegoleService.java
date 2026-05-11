@@ -107,6 +107,11 @@ public class RegoleService {
         Giocatore u = partita.getUmano();
         Giocatore c = partita.getCpu();
 
+        // IMPORTANTE: Partiamo dai punti accumulati con le scope durante la partita
+        // Se non hai un metodo setPunti, assicurati che incrementaPunti aggiunga al totale esistente
+        // u.setPunti(u.getScope());
+        // c.setPunti(c.getScope());
+
         // 1. Settebello (7 di Oro)
         if (controllaSettebello(u)) u.incrementaPunti(1);
         else c.incrementaPunti(1);
@@ -115,11 +120,11 @@ public class RegoleService {
         if (u.getMazzettoPreso().size() > 20) u.incrementaPunti(1);
         else if (c.getMazzettoPreso().size() > 20) c.incrementaPunti(1);
 
-        // 3. Denari (maggior numero di carte di Oro - almeno 6)
+        // 3. Denari (BUG FIX: rimosso .equals("ORO") a favore del confronto Enum ==)
         long denariU = u.getMazzettoPreso().stream()
-                .filter(card -> card.getSeme().equals("ORO")).count();
+                .filter(card -> card.getSeme() == Carta.Seme.ORO).count();
         long denariC = c.getMazzettoPreso().stream()
-                .filter(card -> card.getSeme().equals("ORO")).count();
+                .filter(card -> card.getSeme() == Carta.Seme.ORO).count();
 
         if (denariU > 5) u.incrementaPunti(1);
         else if (denariC > 5) c.incrementaPunti(1);
@@ -136,16 +141,18 @@ public class RegoleService {
      * Calcola il punteggio della Primiera per un giocatore.
      * Si prende la carta con il valore di primiera più alto per ogni seme.
      */
-    private int calcolaValorePrimiera(Giocatore g) {
-        // Mappa dei valori della Primiera (secondo le regole classiche)
-        // 7 -> 21 | 6 -> 18 | Asso -> 16 | 5 -> 15 | 4 -> 14 | 3 -> 13 | 2 -> 12 | Figure -> 10
-        int[] valoriPrimiera = {0, 16, 12, 13, 14, 15, 18, 21, 10, 10, 10};
-        // l'indice 1 è l'Asso, 7 è il sette, 8-9-10 sono le figure
+    private boolean controllaSettebello(Giocatore g) {
+        return g.getMazzettoPreso().stream()
+                .anyMatch(c -> c.getValore() == 7 && c.getSeme() == Carta.Seme.ORO);
+    }
 
-        int[] miglioriPerSeme = {0, 0, 0, 0}; // 0:ORO, 1:COPPE, 2:SPADE, 3:BASTONI
+    private int calcolaValorePrimiera(Giocatore g) {
+        int[] valoriPrimiera = {0, 16, 12, 13, 14, 15, 18, 21, 10, 10, 10};
+        int[] miglioriPerSeme = {0, 0, 0, 0};
 
         for (Carta c : g.getMazzettoPreso()) {
-            int semeIndex = 0;
+            int semeIndex = -1;
+            // Usa direttamente l'Enum nel switch
             switch (c.getSeme()) {
                 case ORO:      semeIndex = 0; break;
                 case COPPE:    semeIndex = 1; break;
@@ -153,21 +160,16 @@ public class RegoleService {
                 case BASTONI:  semeIndex = 3; break;
             }
 
-            int valoreAttuale = valoriPrimiera[c.getValore()];
-            if (valoreAttuale > miglioriPerSeme[semeIndex]) {
-                miglioriPerSeme[semeIndex] = valoreAttuale;
+            if (semeIndex != -1) {
+                int valoreAttuale = valoriPrimiera[c.getValore()];
+                if (valoreAttuale > miglioriPerSeme[semeIndex]) {
+                    miglioriPerSeme[semeIndex] = valoreAttuale;
+                }
             }
         }
 
-        // Se mancano carte di un seme, tecnicamente la Primiera è incompleta,
-        // ma la somma dei migliori valori determina comunque il vincitore.
         int totale = 0;
         for (int v : miglioriPerSeme) totale += v;
         return totale;
-    }
-
-    private boolean controllaSettebello(Giocatore g) {
-        return g.getMazzettoPreso().stream()
-                .anyMatch(c -> c.getValore() == 7 && c.getSeme().equals("ORO"));
     }
 }
