@@ -90,6 +90,7 @@ Una volta che il server è in esecuzione, l'interfaccia di gioco è accessibile 
 
 * **Indirizzo Locale:** Digita nella barra degli indirizzi del browser:
     `http://localhost:8080`
+*![game](_.png)
 
 * **Primo Avvio:**
     Al caricamento della pagina, apparirà la schermata iniziale con il pulsante **"Nuova Partita"**. Se le immagini delle carte non dovessero apparire immediatamente, controlla che il percorso `src/main/resources/static/images/carte/` contenga i file rinominati correttamente.
